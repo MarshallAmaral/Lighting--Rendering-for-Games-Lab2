@@ -34,6 +34,17 @@ struct enemy
 	int max_health;
  };
 
+// Here I will add a struct for the turrets to hold all the relevant information
+struct turret
+{
+	Vector2 position;
+	float range;
+	float fire_rate;
+	int damage;
+	int cost;
+};
+
+
 constexpr std::array<Cell, 4> DIRECTIONS{ Cell{ -1, 0 }, Cell{ 1, 0 }, Cell{ 0, -1 }, Cell{ 0, 1 } };
 
 inline bool InBounds(Cell cell, int rows = TILE_COUNT, int cols = TILE_COUNT)
@@ -134,6 +145,7 @@ int main()
     };
     std::vector<Cell> waypoints = FloodFill({ 0, 12 }, tiles, WAYPOINT);
 	std::vector<enemy> enemies; // here I added a vector of enemies to hold all the enemies that will be spawned in the game
+	std::vector<turret> turrets; // here I added a vector of turrets to hold all the turrets that will be spawned in the game
     int curr = 0;
     int next = curr + 1;
     
