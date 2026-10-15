@@ -25,6 +25,14 @@ struct Cell
     int row;
     int col;
 };
+// Here I will make the enemy struct to hold the all relevant information 
+struct enemy
+{
+	Vector2 position;
+	float speed;
+	int health;
+	int max_health;
+ };
 
 constexpr std::array<Cell, 4> DIRECTIONS{ Cell{ -1, 0 }, Cell{ 1, 0 }, Cell{ 0, -1 }, Cell{ 0, 1 } };
 
@@ -125,6 +133,7 @@ int main()
             { 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }  // 19
     };
     std::vector<Cell> waypoints = FloodFill({ 0, 12 }, tiles, WAYPOINT);
+	std::vector<enemy> enemies; // here I added a vector of enemies to hold all the enemies that will be spawned in the game
     int curr = 0;
     int next = curr + 1;
     
