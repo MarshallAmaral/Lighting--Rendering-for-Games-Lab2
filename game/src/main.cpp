@@ -34,7 +34,7 @@ struct enemy
 	float speed;
 	int health;
 	int max_health;
-    bool destory;
+    bool destroy;
 
     int curr;
     int next;
@@ -45,9 +45,21 @@ struct enemy
 struct turret
 {
 	Vector2 position;
-	float range;
-	float fire_rate;
+	float range = 100;
+	float fire_rate = 1.0f;
+	int damage = 10;
+	enemy* target = nullptr;
+    float fire_timer = 0.0f; // Timer to track firing intervals
+};
+
+struct bullet
+{
+	Vector2 position;
+	Vector2 direction;
+	float speed;
 	int damage;
+	enemy* target = nullptr;
+	bool destroy = false;
 };
 
 
@@ -153,10 +165,11 @@ int main()
     std::vector<Cell> waypoints = FloodFill({ 0, 12 }, tiles, WAYPOINT);
     std::vector<enemy> enemies; // here I added a vector of enemies to hold all the enemies that will be spawned in the game
     std::vector<turret> turrets; // here I added a vector of turrets to hold all the turrets that will be spawned in the game
+	std::vector<bullet> bullets; // here I added a vector of bullets to hold all the bullets that will be spawned in the game
 
     // Here I will add the 5 turrets to the game
     tiles[5][5] = TURRET;
-    tiles[10][6] = TURRET;
+    tiles[10][5] = TURRET;
     tiles[15][14] = TURRET;
     tiles[2][14] = TURRET;
     tiles[15][7] = TURRET;
@@ -168,7 +181,7 @@ int main()
         {
             if (tiles[row][col] == TURRET)
             {
-                turret t;
+                turret t{};
                 t.position = TileCenter(row, col);
                 t.range = 100.0f;
                 t.fire_rate = 1.0f;
@@ -178,7 +191,7 @@ int main()
         }
     }
 
-	// this is the spawn timer and the number of enemies that will be spawned in the game
+	// these are the variables that will be used to spawn the enemies in the game
 
     int SpawnEnemies = 0;
     float SpawnTimer = 0.0f;
@@ -203,10 +216,10 @@ int main()
             e.position = TileCenter(waypoints[e.curr].row, waypoints[e.curr].col);
 
 		// these are the stats for the enemy that will be spawned in the game
-        e.speed = 100.0f;
-        e.health = 100;
-        e.max_health = 100;
-        e.destory = false;
+        e.speed = 90.0f;
+        e.health = 50;
+        e.max_health = 50;
+        e.destroy = false;
         e.at_end = false;
 
         enemies.push_back(e);
@@ -216,7 +229,7 @@ int main()
 
     }
 
-		// Enemy movement using a for loop
+		// Enemy movement using a for loop talked about in class 
 		for (enemy& e : enemies)
 		{
 			if (!e.at_end)
@@ -247,6 +260,61 @@ int main()
 			}
 		}
 
+		// Acquire nearest target for each turret to shoot a bullet at the enemy
+        for (turret& t : turrets)
+        {
+			enemy* nearest_enemy = nullptr;
+			float nearest_distance = t.range;
+			for (enemy& e : enemies)
+			{
+				if (!e.at_end && !e.destroy)
+				{
+					float distance = Vector2Distance(t.position, e.position);
+					if (distance < nearest_distance)
+					{
+						nearest_distance = distance;
+						nearest_enemy = &e;
+					}
+				}
+			}
+			t.target = nearest_enemy;
+
+			t.fire_timer += dt;
+
+			// Fire bullet at target if available
+			if (t.target != nullptr && t.fire_timer >= t.fire_rate)
+			{
+                bullet b{};
+				b.position = t.position;
+				b.direction = Vector2Normalize(t.target->position - t.position);
+				b.speed = 500.0f;
+				b.damage = t.damage;
+				b.target = t.target;
+				bullets.push_back(b);
+				t.fire_timer = 0.0f; // Reset the fire timer
+			}
+        }
+
+		for (bullet& b : bullets) // Update bullet positions and check for collisions with enemies
+		{
+			b.position += b.direction * b.speed * dt; // Move the bullet in its direction
+
+			if (b.target != nullptr && !b.target->destroy && !b.target->at_end)
+			{
+				if (CheckCollisionPointCircle(b.position, b.target->position, 20.0f))
+				{
+                    b.target->health -= b.damage;
+					if (b.target->health <= 0)
+					{
+						b.target->destroy = true;
+					}
+					b.destroy = true; // Bullet has hit the target and set to true for removal
+				}
+			}
+		}
+		bullets.erase(std::remove_if(bullets.begin(), bullets.end(), [](const bullet& b) { return b.destroy; }), bullets.end());
+		enemies.erase(std::remove_if(enemies.begin(), enemies.end(), [](const enemy& e) { return e.destroy; }), enemies.end());
+
         BeginDrawing();
         ClearBackground(BLACK);
 
@@ -259,16 +327,22 @@ int main()
             }
         }
 
-		for (const turret& t : turrets)
+		for (const turret& t : turrets) // Draw the turrets as blue circles
 		{
 			DrawCircleV(t.position, 20.0f, BLUE);
 		}
+		
+		for (const bullet& b : bullets) // Draw the bullets as yellow circles
+		{
+			DrawCircleV(b.position, 10.0f, YELLOW);
+		}
 
-
-		for (const enemy& e : enemies)
+		for (const enemy& e : enemies) // Draw the enemies as red circles
 		{
 			DrawCircleV(e.position, 20.0f, RED);
 		}
+
+
 
         EndDrawing();
     }
