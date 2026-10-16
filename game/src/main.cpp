@@ -16,8 +16,10 @@ enum TileType : int
 {
     GRASS,      // Marks unoccupied space, can be overwritten 
     DIRT,       // Marks the path, cannot be overwritten
-    WAYPOINT,   // Marks where the path turns, cannot be overwritten
+    WAYPOINT,// Marks where the path turns, cannot be overwritten
+    TURRET,
     COUNT
+   
 };
 
 struct Cell
@@ -32,6 +34,7 @@ struct enemy
 	float speed;
 	int health;
 	int max_health;
+    bool destory;
  };
 
 // Here I will add a struct for the turrets to hold all the relevant information
@@ -41,7 +44,6 @@ struct turret
 	float range;
 	float fire_rate;
 	int damage;
-	int cost;
 };
 
 
@@ -59,11 +61,12 @@ void DrawTile(int row, int col, Color color)
 
 void DrawTile(int row, int col, int type)
 {
-    Color colors[3] =
+    Color colors[4] =
     {
         LIME,
         BEIGE,
-        SKYBLUE
+        SKYBLUE,
+        ORANGE
     };
     //assert(type >= 0 && type < COUNT);
     DrawTile(row, col, colors[type]);
@@ -146,6 +149,31 @@ int main()
     std::vector<Cell> waypoints = FloodFill({ 0, 12 }, tiles, WAYPOINT);
 	std::vector<enemy> enemies; // here I added a vector of enemies to hold all the enemies that will be spawned in the game
 	std::vector<turret> turrets; // here I added a vector of turrets to hold all the turrets that will be spawned in the game
+
+    // Here I will add the 5 turrets to the game
+	tiles[5][5] = TURRET;
+	tiles[10][6] = TURRET;
+	tiles[15][14] = TURRET;
+	tiles[2][14] = TURRET;
+	tiles[15][7] = TURRET;
+
+
+	for (int row = 0; row < TILE_COUNT; row++)
+	{
+		for (int col = 0; col < TILE_COUNT; col++)
+		{
+			if (tiles[row][col] == TURRET)
+			{
+				turret t;
+                t.position = TileCenter(row, col);
+                t.range = 100.0f;
+				t.fire_rate = 1.0f;
+				t.damage = 10;
+				turrets.push_back(t);
+			}
+		}
+	}
+
     int curr = 0;
     int next = curr + 1;
     
@@ -191,7 +219,13 @@ int main()
             }
         }
 
-        DrawCircleV(enemy_position, 20.0f, GOLD);
+		for (const turret& t : turrets)
+		{
+			DrawCircleV(t.position, 20.0f, BLUE);
+		}
+
+
+        DrawCircleV(enemy_position, 20.0f, RED);
 
         EndDrawing();
     }
