@@ -35,6 +35,10 @@ struct enemy
 	int health;
 	int max_health;
     bool destory;
+
+    int curr;
+    int next;
+	bool at_end;
  };
 
 // Here I will add a struct for the turrets to hold all the relevant information
@@ -147,41 +151,38 @@ int main()
             { 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }  // 19
     };
     std::vector<Cell> waypoints = FloodFill({ 0, 12 }, tiles, WAYPOINT);
-	std::vector<enemy> enemies; // here I added a vector of enemies to hold all the enemies that will be spawned in the game
-	std::vector<turret> turrets; // here I added a vector of turrets to hold all the turrets that will be spawned in the game
+    std::vector<enemy> enemies; // here I added a vector of enemies to hold all the enemies that will be spawned in the game
+    std::vector<turret> turrets; // here I added a vector of turrets to hold all the turrets that will be spawned in the game
 
     // Here I will add the 5 turrets to the game
-	tiles[5][5] = TURRET;
-	tiles[10][6] = TURRET;
-	tiles[15][14] = TURRET;
-	tiles[2][14] = TURRET;
-	tiles[15][7] = TURRET;
+    tiles[5][5] = TURRET;
+    tiles[10][6] = TURRET;
+    tiles[15][14] = TURRET;
+    tiles[2][14] = TURRET;
+    tiles[15][7] = TURRET;
 
 
-	for (int row = 0; row < TILE_COUNT; row++)
-	{
-		for (int col = 0; col < TILE_COUNT; col++)
-		{
-			if (tiles[row][col] == TURRET)
-			{
-				turret t;
+    for (int row = 0; row < TILE_COUNT; row++)
+    {
+        for (int col = 0; col < TILE_COUNT; col++)
+        {
+            if (tiles[row][col] == TURRET)
+            {
+                turret t;
                 t.position = TileCenter(row, col);
                 t.range = 100.0f;
-				t.fire_rate = 1.0f;
-				t.damage = 10;
-				turrets.push_back(t);
-			}
-		}
-	}
+                t.fire_rate = 1.0f;
+                t.damage = 10;
+                turrets.push_back(t);
+            }
+        }
+    }
 
-    int curr = 0;
-    int next = curr + 1;
-    
-    Vector2 enemy_position = TileCenter(waypoints[curr].row, waypoints[curr].col);
-    float enemy_speed = 250.0f;   // <-- 250 pixels per second
-    float min_distance = enemy_speed / 60.0f;
-    min_distance *= 1.1f;
-    bool at_end = false;
+	// this is the spawn timer and the number of enemies that will be spawned in the game
+
+    int SpawnEnemies = 0;
+    float SpawnTimer = 0.0f;
+
 
     InitWindow(SCREEN_SIZE, SCREEN_SIZE, "Tower Defense");
     SetTargetFPS(60);
@@ -189,23 +190,62 @@ int main()
     {
         float dt = GetFrameTime();
 
-        if (!at_end)
+        // Update spawn timer and spawn enemies
+        SpawnTimer += dt;
+
+		// the if statement below will spawn an enemy every second until there are 10 enemies in the game
+        if (SpawnTimer >= 1.0f && SpawnEnemies < 10)
         {
-            Vector2 from = TileCenter(waypoints[curr].row, waypoints[curr].col);
-            Vector2 to = TileCenter(waypoints[next].row, waypoints[next].col);
-            Vector2 direction = Vector2Normalize(to - from);
-            enemy_position += direction * enemy_speed * dt;
-        
-            // Tolorance depends on enemy speed
-            if (CheckCollisionPointCircle(enemy_position, to, min_distance))
-            {
-                enemy_position = to;
-        
-                curr++;
-                next++;
-                at_end = curr == waypoints.size() - 1;
-            }
-        }
+	    // Create a new enemy and set its initial position to the first waypoint
+            enemy e;
+            e.curr = 0;
+            e.next = 1;
+            e.position = TileCenter(waypoints[e.curr].row, waypoints[e.curr].col);
+
+		// these are the stats for the enemy that will be spawned in the game
+        e.speed = 100.0f;
+        e.health = 100;
+        e.max_health = 100;
+        e.destory = false;
+        e.at_end = false;
+
+        enemies.push_back(e);
+
+        SpawnEnemies++;
+        SpawnTimer -= 1.0f;
+
+    }
+
+		// Enemy movement using a for loop
+		for (enemy& e : enemies)
+		{
+			if (!e.at_end)
+			{
+				Vector2 from = TileCenter(waypoints[e.curr].row, waypoints[e.curr].col);
+				Vector2 to = TileCenter(waypoints[e.next].row, waypoints[e.next].col);
+				Vector2 direction = Vector2Normalize(to - from);
+				e.position += direction * e.speed * dt;
+
+                float min_distance = e.speed * dt * 1.1f;
+             
+				// Tolerance depends on enemy speed
+				if (CheckCollisionPointCircle(e.position, to, min_distance))
+				{
+					e.position = to;
+					e.curr++;
+                    
+					if (e.curr >= static_cast<int>(waypoints.size()) - 1)
+					{
+						e.at_end = true;
+					}
+					else
+					{
+						e.next = e.curr + 1;
+					}
+
+				}
+			}
+		}
 
         BeginDrawing();
         ClearBackground(BLACK);
@@ -225,7 +265,10 @@ int main()
 		}
 
 
-        DrawCircleV(enemy_position, 20.0f, RED);
+		for (const enemy& e : enemies)
+		{
+			DrawCircleV(e.position, 20.0f, RED);
+		}
 
         EndDrawing();
     }
