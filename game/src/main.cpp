@@ -22,6 +22,13 @@ enum TileType : int
    
 };
 
+enum GameState
+{
+    PreGame,
+	PLAYING,
+	GAME_OVER
+};
+
 struct Cell
 {
     int row;
@@ -82,7 +89,7 @@ void DrawTile(int row, int col, int type)
         LIME,
         BEIGE,
         SKYBLUE,
-        ORANGE
+        LIME
     };
     //assert(type >= 0 && type < COUNT);
     DrawTile(row, col, colors[type]);
@@ -162,18 +169,13 @@ int main()
             { 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }, // 18
             { 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }  // 19
     };
+    // This is the game state variable that will be used to control the flow of the game and what point of the game we are in
+    GameState state = PreGame;
+
     std::vector<Cell> waypoints = FloodFill({ 0, 12 }, tiles, WAYPOINT);
     std::vector<enemy> enemies; // here I added a vector of enemies to hold all the enemies that will be spawned in the game
     std::vector<turret> turrets; // here I added a vector of turrets to hold all the turrets that will be spawned in the game
-	std::vector<bullet> bullets; // here I added a vector of bullets to hold all the bullets that will be spawned in the game
-
-    // Here I will add the 5 turrets to the game
-    tiles[5][5] = TURRET;
-    tiles[10][5] = TURRET;
-    tiles[15][14] = TURRET;
-    tiles[2][14] = TURRET;
-    tiles[15][7] = TURRET;
-
+    std::vector<bullet> bullets; // here I added a vector of bullets to hold all the bullets that will be spawned in the game
 
     for (int row = 0; row < TILE_COUNT; row++)
     {
@@ -191,7 +193,7 @@ int main()
         }
     }
 
-	// these are the variables that will be used to spawn the enemies in the game
+    // these are the variables that will be used to spawn the enemies in the game
 
     int SpawnEnemies = 0;
     float SpawnTimer = 0.0f;
@@ -203,150 +205,194 @@ int main()
     {
         float dt = GetFrameTime();
 
-        // Update spawn timer and spawn enemies
-        SpawnTimer += dt;
 
-		// the if statement below will spawn an enemy every second until there are 10 enemies in the game
-        if (SpawnTimer >= 1.0f && SpawnEnemies < 10)
+        if (state == PreGame)
         {
-	    // Create a new enemy and set its initial position to the first waypoint
-            enemy e;
-            e.curr = 0;
-            e.next = 1;
-            e.position = TileCenter(waypoints[e.curr].row, waypoints[e.curr].col);
+            // Initialize turrets based on the tiles array
+            Vector2 mouse = GetMousePosition();
 
-		// these are the stats for the enemy that will be spawned in the game
-        e.speed = 90.0f;
-        e.health = 50;
-        e.max_health = 50;
-        e.destroy = false;
-        e.at_end = false;
+            int col = static_cast<int>(mouse.x / TILE_SIZE);
+            int row = static_cast<int>(mouse.y / TILE_SIZE);
 
-        enemies.push_back(e);
-
-        SpawnEnemies++;
-        SpawnTimer -= 1.0f;
-
-    }
-
-		// Enemy movement using a for loop talked about in class 
-		for (enemy& e : enemies)
-		{
-			if (!e.at_end)
-			{
-				Vector2 from = TileCenter(waypoints[e.curr].row, waypoints[e.curr].col);
-				Vector2 to = TileCenter(waypoints[e.next].row, waypoints[e.next].col);
-				Vector2 direction = Vector2Normalize(to - from);
-				e.position += direction * e.speed * dt;
-
-                float min_distance = e.speed * dt * 1.1f;
-             
-				// Tolerance depends on enemy speed
-				if (CheckCollisionPointCircle(e.position, to, min_distance))
-				{
-					e.position = to;
-					e.curr++;
-                    
-					if (e.curr >= static_cast<int>(waypoints.size()) - 1)
-					{
-						e.at_end = true;
-					}
-					else
-					{
-						e.next = e.curr + 1;
-					}
-
-				}
-			}
-		}
-
-		// Acquire nearest target for each turret to shoot a bullet at the enemy
-        for (turret& t : turrets)
-        {
-			enemy* nearest_enemy = nullptr;
-			float nearest_distance = t.range;
-			for (enemy& e : enemies)
-			{
-				if (!e.at_end && !e.destroy)
-				{
-					float distance = Vector2Distance(t.position, e.position);
-					if (distance < nearest_distance)
-					{
-						nearest_distance = distance;
-						nearest_enemy = &e;
-					}
-				}
-			}
-			t.target = nearest_enemy;
-
-			t.fire_timer += dt;
-
-			// Fire bullet at target if available
-			if (t.target != nullptr && t.fire_timer >= t.fire_rate)
-			{
-                bullet b{};
-				b.position = t.position;
-				b.direction = Vector2Normalize(t.target->position - t.position);
-				b.speed = 500.0f;
-				b.damage = t.damage;
-				b.target = t.target;
-				bullets.push_back(b);
-				t.fire_timer = 0.0f; // Reset the fire timer
-			}
-        }
-
-		for (bullet& b : bullets) // Update bullet positions and check for collisions with enemies
-		{
-			b.position += b.direction * b.speed * dt; // Move the bullet in its direction
-
-			if (b.target != nullptr && !b.target->destroy && !b.target->at_end)
-			{
-				if (CheckCollisionPointCircle(b.position, b.target->position, 20.0f))
-				{
-                    b.target->health -= b.damage;
-					if (b.target->health <= 0)
-					{
-						b.target->destroy = true;
-					}
-					b.destroy = true; // Bullet has hit the target and set to true for removal
-				}
-			}
-		}
-		bullets.erase(std::remove_if(bullets.begin(), bullets.end(), [](const bullet& b) { return b.destroy; }), bullets.end());
-		enemies.erase(std::remove_if(enemies.begin(), enemies.end(), [](const enemy& e) { return e.destroy; }), enemies.end());
-
-        BeginDrawing();
-        ClearBackground(BLACK);
-
-        // Draw entire grid
-        for (int row = 0; row < TILE_COUNT; row++)
-        {
-            for (int col = 0; col < TILE_COUNT; col++)
+            if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && InBounds({ row, col }) && tiles[row][col] == GRASS && turrets.size() < 5)
             {
-                DrawTile(row, col, tiles[row][col]);
+                turret t{};
+                t.position = TileCenter(row, col);
+                t.range = 150.0f;
+                t.damage = 10;
+                t.fire_rate = 1.0f;
+
+                turrets.push_back(t);
+
+                tiles[row][col] = TURRET;
+            }
+
+            else if (IsMouseButtonPressed(MOUSE_BUTTON_RIGHT) && InBounds({ row, col }) && tiles[row][col] == TURRET)
+            {
+                // Remove turret from the vector
+                turrets.erase(std::remove_if(turrets.begin(), turrets.end(), [row, col](const turret& t) {
+                    Vector2 center = TileCenter(row, col);
+                    return t.position.x == center.x && t.position.y == center.y;
+                    }), turrets.end());
+                // Change tile back to GRASS
+                tiles[row][col] = GRASS;
+            }
+            if (IsKeyPressed(KEY_ENTER))
+            {
+                state = PLAYING;
             }
         }
 
-		for (const turret& t : turrets) // Draw the turrets as blue circles
-		{
-			DrawCircleV(t.position, 20.0f, BLUE);
-		}
-		
-		for (const bullet& b : bullets) // Draw the bullets as yellow circles
-		{
-			DrawCircleV(b.position, 10.0f, YELLOW);
-		}
 
-		for (const enemy& e : enemies) // Draw the enemies as red circles
-		{
-			DrawCircleV(e.position, 20.0f, RED);
-		}
+        if (state == PLAYING)
+        {
+            // Update spawn timer and spawn enemies
+            SpawnTimer += dt;
+
+            if (SpawnEnemies < 10 && SpawnTimer >= 1.0f)
+            {
+                enemy e;
+                e.curr = 0;
+                e.next = 1;
+                e.position = TileCenter(waypoints[e.curr].row, waypoints[e.curr].col);
+                e.speed = 90.0f;
+                e.health = 50;
+                e.max_health = 50;
+                e.destroy = false;
+                e.at_end = false;
+                enemies.push_back(e);
+                SpawnEnemies++;
+                SpawnTimer -= 1.0f;
+            }
+
+                // Enemy movement using a for loop talked about in class 
+                for (enemy& e : enemies)
+                {
+                    if (!e.at_end)
+                    {
+                        Vector2 from = TileCenter(waypoints[e.curr].row, waypoints[e.curr].col);
+                        Vector2 to = TileCenter(waypoints[e.next].row, waypoints[e.next].col);
+                        Vector2 direction = Vector2Normalize(to - from);
+                        e.position += direction * e.speed * dt;
+
+                        float min_distance = e.speed * dt * 1.1f;
+
+                        // Tolerance depends on enemy speed
+                        if (CheckCollisionPointCircle(e.position, to, min_distance))
+                        {
+                            e.position = to;
+                            e.curr++;
+
+                            if (e.curr >= static_cast<int>(waypoints.size()) - 1)
+                            {
+                                e.at_end = true;
+                            }
+                            else
+                            {
+                                e.next = e.curr + 1;
+                            }
+
+                        }
+                    }
+                }
+
+                // Acquire nearest target for each turret to shoot a bullet at the enemy
+                for (turret& t : turrets)
+                {
+                    enemy* nearest_enemy = nullptr;
+                    float nearest_distance = t.range;
+                    for (enemy& e : enemies)
+                    {
+                        if (!e.at_end && !e.destroy)
+                        {
+                            float distance = Vector2Distance(t.position, e.position);
+                            if (distance < nearest_distance)
+                            {
+                                nearest_distance = distance;
+                                nearest_enemy = &e;
+                            }
+                        }
+                    }
+                    t.target = nearest_enemy;
+
+                    t.fire_timer += dt;
+
+                    // Fire bullet at target if available
+                    if (t.target != nullptr && t.fire_timer >= t.fire_rate)
+                    {
+                        bullet b{};
+                        b.position = t.position;
+                        b.direction = Vector2Normalize(t.target->position - t.position);
+                        b.speed = 500.0f;
+                        b.damage = t.damage;
+                        b.target = t.target;
+                        bullets.push_back(b);
+                        t.fire_timer = 0.0f; // Reset the fire timer
+                    }
+                }
+
+                for (bullet& b : bullets) // Update bullet positions and check for collisions with enemies
+                {
+                    b.position += b.direction * b.speed * dt; // Move the bullet in its direction
+
+                    if (b.target != nullptr && !b.target->destroy && !b.target->at_end)
+                    {
+                        if (CheckCollisionPointCircle(b.position, b.target->position, 20.0f))
+                        {
+                            b.target->health -= b.damage;
+                            if (b.target->health <= 0)
+                            {
+                                b.target->destroy = true;
+                            }
+                            b.destroy = true; // Bullet has hit the target and set to true for removal
+                        }
+                    }
+                }
+
+                bullets.erase(std::remove_if(bullets.begin(), bullets.end(), [](const bullet& b) { return b.destroy; }), bullets.end());
+                enemies.erase(std::remove_if(enemies.begin(), enemies.end(), [](const enemy& e) { return e.destroy; }), enemies.end()); 
+        }
+
+
+            BeginDrawing();
+            ClearBackground(BLACK);
+
+            // Draw entire grid
+            for (int row = 0; row < TILE_COUNT; row++)
+            {
+                for (int col = 0; col < TILE_COUNT; col++)
+                {
+                    DrawTile(row, col, tiles[row][col]);
+                }
+            }
+
+			// Draw instructions for placing turrets in PreGame state
+			if (state == PreGame)
+			{
+				DrawText("Place turrets with left click, remove with right click. Press Enter to start.", 20, 400, 20, WHITE);
+			}
+			
+
+            for (const turret& t : turrets) // Draw the turrets as blue circles
+            {
+                DrawCircleV(t.position, 20.0f, BLUE);
+            }
+
+            for (const bullet& b : bullets) // Draw the bullets as yellow circles
+            {
+                DrawCircleV(b.position, 10.0f, YELLOW);
+            }
+
+            for (const enemy& e : enemies) // Draw the enemies as red circles
+            {
+                DrawCircleV(e.position, 20.0f, RED);
+            }
 
 
 
-        EndDrawing();
+            EndDrawing();
+        
     }
     CloseWindow();
     return 0;
 }
-
