@@ -323,7 +323,7 @@ int main()
                 t.position = TileCenter(row, col);
                 t.range = 150.0f;
                 t.damage = 15;
-                t.fire_rate = 1.2f;
+                t.fire_rate = 0.8f;
 
                 turrets.push_back(t);
 
