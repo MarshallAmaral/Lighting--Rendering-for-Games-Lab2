@@ -182,6 +182,14 @@ void SetEnemyStats(enemy& e, EnemyType type)
 
 int main()
 {
+	InitAudioDevice();
+
+    Sound TurretCreateSound = LoadSound("Assets/Audio/TurretPlace.mp3");
+    Sound TurretDestroySound = LoadSound("Assets/Audio/TurretRemove.wav");
+    Sound TurretShootSound = LoadSound("Assets/Audio/TurretShoot.ogg");
+    Sound EnemyHitSound = LoadSound("Assets/Audio/EnemyHit.mp3");
+    Sound EnemyDeathSound = LoadSound("Assets/Audio/EnemyDeath.ogg");
+
     int Level1[TILE_COUNT][TILE_COUNT]
     {
         //col:0  1  2  3  4  5  6  7  8  9 10 11 12 13 14 15 16 17 18 19    row:
@@ -320,6 +328,7 @@ int main()
                 turrets.push_back(t);
 
                 tiles[row][col] = TURRET;
+                PlaySound(TurretCreateSound);
             }
 
             else if (IsMouseButtonPressed(MOUSE_BUTTON_RIGHT) && InBounds({ row, col }) && tiles[row][col] == TURRET)
@@ -329,6 +338,7 @@ int main()
                     Vector2 center = TileCenter(row, col);
                     return t.position.x == center.x && t.position.y == center.y;
                     }), turrets.end());
+                PlaySound(TurretDestroySound);
                 // Change tile back to GRASS
                 tiles[row][col] = GRASS;
             }
@@ -468,6 +478,7 @@ int main()
                     // Fire bullet at target if available
                     if (t.target != nullptr && t.fire_timer >= t.fire_rate)
                     {
+                        PlaySound(TurretShootSound);
                         bullet b{};
                         b.position = t.position;
                         b.direction = Vector2Normalize(t.target->position - t.position);
@@ -491,6 +502,11 @@ int main()
                             if (b.target->health <= 0)
                             {
                                 b.target->destroy = true;
+                                PlaySound(EnemyDeathSound);
+                            }
+                            else 
+                            {
+                                PlaySound(EnemyHitSound);
                             }
                             b.destroy = true; // Bullet has hit the target and set to true for removal
                         }
@@ -661,6 +677,15 @@ int main()
             EndDrawing();
         
     }
+
+    UnloadSound(TurretCreateSound);
+    UnloadSound(TurretDestroySound);
+    UnloadSound(EnemyDeathSound);
+    UnloadSound(EnemyHitSound);
+    UnloadSound(TurretShootSound);
+
+    CloseAudioDevice();
+
     CloseWindow();
     return 0;
 }
